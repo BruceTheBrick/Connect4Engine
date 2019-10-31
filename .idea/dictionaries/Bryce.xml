@@ -1,7 +1,9 @@
 <component name="ProjectDictionaryState">
   <dictionary name="Bryce">
     <words>
+      <w>firstplayer</w>
       <w>isready</w>
+      <w>minimax</w>
       <w>nega</w>
       <w>perft</w>
       <w>startpos</w>

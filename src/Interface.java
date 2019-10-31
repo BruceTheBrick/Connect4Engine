@@ -45,10 +45,13 @@ public class Interface {
                 case "go":
 
                     //Determines which time (ftime or stime) is for Martini
+
                     if(martini.isFirst())
                         martini.findBestMove(Integer.parseInt(input[2]));
                     else
                         martini.findBestMove(Integer.parseInt(input[4]));
+
+
                     break;
 
                 case "perft":

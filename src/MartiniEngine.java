@@ -4,7 +4,7 @@ import java.util.Queue;
 public class MartiniEngine {
 
     private String name = "Martini-C3260061";
-    private Node currentBoardNode = new Node();
+    private int[] currentBoard = new int[42];
 
     //Values of the board. Higher numbers mean that space is more desirable
     private int[] boardValues = {1,  5, 10, 50,  10, 5, 1,
@@ -14,7 +14,6 @@ public class MartiniEngine {
                                  10, 15, 20, 55,  20, 15, 20,
                                  1,  5, 10, 50,  10, 5, 1};
     private int EMPTY = 0;
-    private int OPPONENT = 2;
     private int MINE = 1;
     private int FIRSTPLAYER = 2;
 
@@ -31,11 +30,11 @@ public class MartiniEngine {
 
         //Converts last character of game log to integer value representing column number
         int col = Character.getNumericValue(input.charAt(input.length() - 1));
-        int finalAddress = findAvailableSpace(col, currentBoardNode.getState());
+        int finalAddress = findAvailableSpace(col, currentBoard);
 
         //Ensures finalAddress is a valid index
         if(finalAddress >= 0) {
-            currentBoardNode.getState()[finalAddress] = player;
+            currentBoard[finalAddress] = player;
         }
 
         return finalAddress;
@@ -46,33 +45,43 @@ public class MartiniEngine {
         int bestVal = 0;
         int index = 0;
         int score;
-        LinkedList<Node> children = initChildren(currentBoardNode, MINE);
+        int address;
+        //LinkedList<Node> children = initChildren(currentBoardNode, MINE);
 
         //As we at iterating over the children generated for my moves, negaMax must
         //first run and favour the opponent
         if(FIRSTPLAYER == MINE) {
             bestVal = Integer.MIN_VALUE;
-            for (int i = 0; i < children.size(); i++) {
-                score = mini(children.get(i), calcDepth(timeRemaining), Integer.MAX_VALUE, Integer.MIN_VALUE);
+            for (int i = 0; i < 7; i++) {
+                address = findAvailableSpace(i, currentBoard);
+                if(address < 0) continue;
+                makeMove(address, MINE);
+
+                score = mini(currentBoard, calcDepth(timeRemaining), Integer.MIN_VALUE, Integer.MAX_VALUE, (3-FIRSTPLAYER));
                 if (score > bestVal) {
                     bestVal = score;
                     index = i;
                 }
+                undoMove(address);
             }
         }
         else {
             bestVal = Integer.MAX_VALUE;
-            for (int i = 0; i < children.size(); i++) {
-                score = maxi(children.get(i), calcDepth(timeRemaining), Integer.MIN_VALUE, Integer.MAX_VALUE);
+            for (int i = 0; i < 7; i++) {
+                address = findAvailableSpace(i, currentBoard);
+                if(address < 0) continue;
+                makeMove(address, MINE);
+                score = maxi(currentBoard, calcDepth(timeRemaining), Integer.MIN_VALUE, Integer.MAX_VALUE, FIRSTPLAYER);
                 if (score < bestVal) {
                     bestVal = score;
                     index = i;
                 }
+                undoMove(address);
             }
         }
 
-        System.out.println("bestmove " + children.get(index).getColNum() +  " " + bestVal);
-        updateBoard(Integer.toString(children.get(index).getColNum()), 1);
+        System.out.println("bestmove " + index +  " " + bestVal);
+        updateBoard(Integer.toString(index), 1);
     }
 
     //Response to perft x
@@ -91,11 +100,11 @@ public class MartiniEngine {
 
     //Getters & Setters
     //------------------------------------------------------------------------------------------------------------------
-    public int[] getCurrentBoard(){return currentBoardNode.getState();}
-    public Node getGameTree(){return currentBoardNode;}
+    public int[] getCurrentBoard(){return currentBoard;}
     public void setFirstPlayer(int FIRSTPLAYER){this.FIRSTPLAYER = FIRSTPLAYER;}
     public boolean isFirst(){return FIRSTPLAYER == MINE;}
-    public int getFirstPlayer(){return FIRSTPLAYER;}
+    public boolean isFull(int colNum){return currentBoard[colNum] != EMPTY;}
+    public boolean isAvailable(int colNum){return currentBoard[colNum] == EMPTY;}
 
     //Win Checking Functions
     //------------------------------------------------------------------------------------------------------------------
@@ -363,38 +372,74 @@ public class MartiniEngine {
 
     //Minimax and Evaluation function implementations
     //------------------------------------------------------------------------------------------------------------------
-    public int maxi(Node root, int depth, int alpha, int beta){
+    public int maxi(int[] root, int depth, int alpha, int beta, int player){
         int score;
 
         if(depth == 0) return evaluation(root, depth+1);
-        if(checkWin(root.getState()).hasWin()) return evaluation(root, depth+1);
+        //if(checkWin(root).hasWin()) return evaluation(root, depth+1);
 
         int max = Integer.MIN_VALUE;
-        LinkedList<Node> children = initChildren(root, 3-root.getPlayer());
+        int address;
 
-        for(int i = 0; i < children.size(); i++){
-            score = mini (children.get(i), depth - 1, alpha, beta);
-            if(score > max) max = score;
+        //One loop for each column
+        for(int i = 0; i < 7; i++){
+
+            //Finds the lowest space of column i
+            address = findAvailableSpace(i, root);
+
+            //Ensures the address is in bounds
+            if(address < 0) continue;
+
+            //Makes a move
+            root[address] = player;
+
+            //score = mini (root, depth - 1, alpha, beta, 3- player);
+            //if(score > max) max = score;
+            score = mini (root, depth - 1, alpha, beta, 3- player);
+            max = Math.max(max, score);
+            alpha = Math.max(alpha, max);
+
+
+            //Undoes the move
+            root[address] = EMPTY;
+            if(beta <= alpha) break;
         }
         return max;
     }
-    public int mini(Node root, int depth, int alpha, int beta){
+    public int mini(int[] root, int depth, int alpha, int beta, int player){
         int score;
 
         if(depth == 0) return evaluation(root, depth+1);
-        if(checkWin(root.getState()).hasWin()) return evaluation(root, depth+1);
+        //if(checkWin(root).hasWin()) return evaluation(root, depth+1);
 
         int min = Integer.MAX_VALUE;
-        LinkedList<Node> children = initChildren(root, 3-root.getPlayer());
+        int address;
 
-        for(int i = 0; i < children.size(); i++){
-            score = maxi(children.get(i), depth - 1, alpha, beta);
-            if(score < min) min = score;
+        //One loop for each column
+        for(int i = 0; i < 7; i++){
+
+            //Finds the lowest space of column i
+            address = findAvailableSpace(i, root);
+
+            //Ensures the address is in bounds
+            if(address < 0) continue;
+
+            //Makes a move
+            root[address] = player;
+
+            //score = maxi(root, depth - 1, alpha, beta, 3 - player);
+            score = maxi(root, depth - 1, alpha, beta, 3-player);
+            //if(score < min) min = score;
+            min = Math.min(min, score);
+            beta = Math.min(beta, min);
+            //Undoes the move
+            root[address] = EMPTY;
+            if(beta <= alpha) break;
         }
         return min;
     }
-    public int evaluation(Node root, int depth){
-        WinPair result = checkWin(root.getState());
+    public int evaluation(int[] root, int depth){
+        WinPair result = checkWin(root);
 
         int sum = 0;
 
@@ -416,9 +461,9 @@ public class MartiniEngine {
             }
         }
 
-        for(int i = 0; i < root.getState().length; i++) {
-            if (root.getState()[i] == FIRSTPLAYER) sum += boardValues[i];
-            else if (root.getState()[i] == 3-FIRSTPLAYER) sum -= boardValues[i];
+        for(int i = 0; i < root.length; i++) {
+            if (root[i] == FIRSTPLAYER) sum += boardValues[i];
+            else if (root[i] == 3-FIRSTPLAYER) sum -= boardValues[i];
         }
 
         return sum;
@@ -478,14 +523,14 @@ public class MartiniEngine {
     }
 
     //Counts the number of 2 consecutive 'currentPlayer' pieces within the current board
-    public int numOfTwos(Node root, int currentPlayer){
+    public int numOfTwos(int[] root, int currentPlayer){
         int sum = 0;
         for(int i = 0; i < PrecomputedIndexes.twoInARow.length; i++){
 
             //Checks to see if the ith space has the currentPlayer's piece in it
-            if(root.getState()[i] == currentPlayer) {
+            if(root[i] == currentPlayer) {
                 for (int j = 0; j < PrecomputedIndexes.twoInARow[i].size(); j++) {
-                    if(root.getState()[PrecomputedIndexes.twoInARow[i].get(j)] == currentPlayer){
+                    if(root[PrecomputedIndexes.twoInARow[i].get(j)] == currentPlayer){
                         sum++;
                     }
                 }
@@ -495,15 +540,15 @@ public class MartiniEngine {
     }
 
     //Counts the number of 3 consecutive 'currentPlayer' pieces within the current baord
-    public int numOfThrees(Node root, int currentPlayer){
+    public int numOfThrees(int[] root, int currentPlayer){
         int sum = 0;
         for(int i = 0; i < PrecomputedIndexes.threeInARow.length; i++){
 
             //Checks to see if the ith space has the currentPlayer's piece in it
-            if(root.getState()[i] == currentPlayer) {
+            if(root[i] == currentPlayer) {
 
                 for (int j = 0; j < PrecomputedIndexes.threeInARow[i].size() - 1; j = j + 2) {
-                    if(root.getState()[PrecomputedIndexes.threeInARow[i].get(j)] == currentPlayer && root.getState()[PrecomputedIndexes.threeInARow[i].get(j+1)] == currentPlayer){
+                    if(root[PrecomputedIndexes.threeInARow[i].get(j)] == currentPlayer && root[PrecomputedIndexes.threeInARow[i].get(j+1)] == currentPlayer){
                         sum++;
                     }
                 }
@@ -514,11 +559,16 @@ public class MartiniEngine {
 
     //Returns a depth to generate moves to based on the timeRemaining of the player
     public int calcDepth(int timeRemaining){
-        if(timeRemaining > 15000) return 7;
-        else if(timeRemaining > 1000 && timeRemaining < 9999) return 5;
-        else if(timeRemaining > 300 && timeRemaining < 999) return 3;
-        else return 2;
+        return 9;
     }
+
+    //Basically just a fancy way of updating the 'address'th element of currentBoard.
+    //Used largely for readability sake
+    public void makeMove(int address, int player){currentBoard[address] = player;}
+
+    //Virtually the same as makeMove, fancy way of undoing a move given the address.
+    //Used largely for readability sake
+    public void undoMove(int address){ currentBoard[address] = EMPTY; }
 
     //Debug functions
     //------------------------------------------------------------------------------------------------------------------
@@ -527,8 +577,8 @@ public class MartiniEngine {
         StringBuilder sb = new StringBuilder();
 
         int counter = 0;
-        for(int i = 0; i < currentBoardNode.getState().length; i++) {
-            sb.append(currentBoardNode.getState()[i]);
+        for(int i = 0; i < currentBoard.length; i++) {
+            sb.append(currentBoard[i]);
             sb.append("\t");
             counter++;
             if(counter == 7) {
@@ -551,39 +601,6 @@ public class MartiniEngine {
         FIRSTPLAYER = MINE;
     }
 
-    public void printTreeBreadth(Node root){
-        Queue<Node> q = new LinkedList<>();
-        q.add(root);
-
-        while(!q.isEmpty()){
-            Node current = q.poll();
-            if(current != null){
-                System.out.println("Name: " + current.name + " Value: " + current.getValue() + " PLAYER: " + current.getPlayer());
-                for(int i = 0; i < current.getChildren().size(); i++){
-                    q.add(current.getChildren().get(i));
-                }
-            }
-        }
-
-    }
-
-    //Prints details of all children of root
-    public void printKids(Node root){
-        StringBuilder sb = new StringBuilder();
-        sb.append("PARENT: ");
-        sb.append(root.name);
-        sb.append("\n");
-        for(int i = 0; i < root.getChildren().size(); i++){
-            sb.append("Child Num ");
-            sb.append(root.getChildren().get(i).name);
-            sb.append(" VALUE: ");
-            sb.append(root.getChildren().get(i).getValue());
-            sb.append(" PLAYER: ");
-            sb.append(root.getChildren().get(i).getPlayer());
-            sb.append("\n");
-        }
-        System.out.println(sb.toString());
-    }
 
     //WinPair class
     //When checking for a win on a given board, this object contains true/false if there is/isnt a win, and if there
@@ -607,8 +624,7 @@ public class MartiniEngine {
         public boolean hasWin(){return hasWin;}
     }
 
-
-    //Maybe another easter egg. You dont know!
+    //Sneaky lil easter eggs maybe
     public String[] initJokes(){
         String[] jokes = new String[6];
         jokes[0] = "Why do birds fly to warmer climates in the winter?\nIts much easier than walking!";
@@ -619,8 +635,6 @@ public class MartiniEngine {
         jokes[5] = "What do you call a half-twisted, one-sided nudie bar?\nA Strip club!";
         return jokes;
     }
-    //Sneaky lil easter egg ;)
-    //Call it. You know you want to...
     public void getIntro(){
         //Fancy logo
         //ASCII art sourced from https://www.asciiart.eu/food-and-drinks/drinks
